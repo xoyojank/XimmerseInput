@@ -1,0 +1,20 @@
+{
+    "FileVersion" : 1,
+	"FriendlyName" : "Ximmerse Input Plugin",
+	"Version" : 1,
+	"VersionName" : "0.1.0",
+	"CreatedBy" : "xoyojank",
+	"CreatedByURL" : "http://www.ximmerse.com",
+	"DocsURL" : "http://www.ximmerse.com/cat/developers",
+	"Description" : "Plugin for the Ximmerse X-Cobra Motion Controller",
+	"Category" : "Input Devices",
+    "Modules" :
+	[
+		{
+			"Name" : "XimmerseInput",
+			"Type" : "Runtime",
+            "LoadingPhase": "PostConfigInit",
+			"WhitelistPlatforms" : [ "Win64", "Android" ]
+		}
+	]
+}

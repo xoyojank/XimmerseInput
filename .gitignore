@@ -1,0 +1,13 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+*.pdb
+
+# folders
+Intermediate/*
+
+# ignore compiled dlls
+Binaries/Win64/UE4Editor-XimmerseInput.dll
+Binaries/Win64/UE4Editor.modules
