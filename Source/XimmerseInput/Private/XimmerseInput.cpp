@@ -2,12 +2,10 @@
 
 #include "XimmerseInputPrivatePCH.h"
 #include "XimmerseInput.h"
+#include <ControllerState.h>
 
 DEFINE_LOG_CATEGORY_STATIC(LogXimmerseInput, Log, All);
 
-/** Controller axis mappings. @todo steamvr: should enumerate rather than hard code */
-#define TOUCHPAD_AXIS	0
-#define TRIGGER_AXIS	1
 #define DOT_45DEG		0.7071f
 
 //
@@ -119,17 +117,34 @@ void FXimmerseInput::SendControllerEvents()
 			bool CurrentStates[EXimmerseInputButton::TotalButtonCount] = { 0 };
 
 			// Get the current state of all buttons
-			CurrentStates[EXimmerseInputButton::System] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_START);
-			CurrentStates[EXimmerseInputButton::ApplicationMenu] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_A);
-			CurrentStates[EXimmerseInputButton::TouchPadPress] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_LEFT_THUMB);
-			CurrentStates[EXimmerseInputButton::TouchPadTouch] = !!(VRControllerState.buttons & 0);
-			CurrentStates[EXimmerseInputButton::TriggerPress] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_LEFT_TRIGGER);
-			CurrentStates[EXimmerseInputButton::Grip] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_LEFT_SHOULDER);
+			CurrentStates[EXimmerseInputButton::System] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_HOME);
+			CurrentStates[EXimmerseInputButton::ApplicationMenu] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_APP);
+			CurrentStates[EXimmerseInputButton::TouchPadPress] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_CLICK);
+			CurrentStates[EXimmerseInputButton::TouchPadTouch] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_TOUCH);
+			CurrentStates[EXimmerseInputButton::TriggerPress] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_TRIGGER);
+			CurrentStates[EXimmerseInputButton::Grip] = !!(VRControllerState.buttons & (CONTROLLER_BUTTON_LEFT_GRIP | CONTROLLER_BUTTON_RIGHT_GRIP));
+
+			// If the touchpad isn't currently pressed or touched, zero put both of the axes
+			if (!CurrentStates[ESteamVRControllerButton::TouchPadTouch])
+			{
+				VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X] = 0.0f;
+				VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_Y] = 0.0f;
+			}
+
 			// D-pad emulation
-			CurrentStates[EXimmerseInputButton::TouchPadUp] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_LEFT_THUMB_UP);
-			CurrentStates[EXimmerseInputButton::TouchPadDown] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_LEFT_THUMB_DOWN);
-			CurrentStates[EXimmerseInputButton::TouchPadLeft] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_LEFT_THUMB_LEFT);
-			CurrentStates[EXimmerseInputButton::TouchPadRight] = !!(VRControllerState.buttons & (int)CONTROLLER_BUTTON_LEFT_THUMB_RIGHT);
+			const FVector2D TouchDir = FVector2D(VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X], VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_Y]).GetSafeNormal();
+			const FVector2D UpDir(0.f, 1.f);
+			const FVector2D RightDir(1.f, 0.f);
+
+			const float VerticalDot = TouchDir | UpDir;
+			const float RightDot = TouchDir | RightDir;
+
+			const bool bPressed = !TouchDir.IsNearlyZero() && CurrentStates[EXimmerseInputButton::TouchPadPress];
+
+			CurrentStates[EXimmerseInputButton::TouchPadUp] = bPressed && (VerticalDot >= DOT_45DEG);
+			CurrentStates[EXimmerseInputButton::TouchPadDown] = bPressed && (VerticalDot <= -DOT_45DEG);
+			CurrentStates[EXimmerseInputButton::TouchPadLeft] = bPressed && (RightDot <= -DOT_45DEG);
+			CurrentStates[EXimmerseInputButton::TouchPadRight] = bPressed && (RightDot >= DOT_45DEG);
 
 			if (ControllerState.TouchPadXAnalog != VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X])
 			{
