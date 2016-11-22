@@ -1,5 +1,4 @@
 // Copyright 1998-2016 Epic Games, Inc. All Rights Reserved.
-
 #pragma once
 
 #include "ModuleManager.h"
@@ -8,6 +7,7 @@
 #ifdef XIMMERSE_INPUT_SUPPORTED_PLATFORMS
 #define XIMMERSE_INPUT_SUPPORTED_PLATFORMS (PLATFORM_WINDOWS && WINVER > 0x0502)
 #endif
+#define XIMMERSE_INPUT_VIBRATION_ENABLED	0
 
 /**
 * The public interface to this module.  In most cases, this interface is only public to sibling modules

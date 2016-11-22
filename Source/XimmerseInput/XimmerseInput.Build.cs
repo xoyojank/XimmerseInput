@@ -44,12 +44,14 @@ public class XimmerseInput : ModuleRules
 			"CoreUObject",
 			"InputCore",
 			"Engine",
+			"InputDevice",
 		}
 		);
 
 		bool isLibrarySupported = false;
 
 		PublicIncludePaths.Add(Path.Combine(ThirdPartyPath, "Ximmerse/include"));
+
 		if (Target.Platform == UnrealTargetPlatform.Win64)
 		{
 			isLibrarySupported = true;
@@ -64,4 +66,5 @@ public class XimmerseInput : ModuleRules
 		Definitions.Add(string.Format("XIMMERSE_INPUT_SUPPORTED_PLATFORMS={0}", isLibrarySupported ? 1 : 0));
 		//Add DLL for packaging
 	}
+}
 }

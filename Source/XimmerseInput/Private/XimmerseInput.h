@@ -1,4 +1,5 @@
 // Copyright 1998-2016 Epic Games, Inc. All Rights Reserved.
+#pragma once
 
 #include "IXimmerseInputPlugin.h"
 #include "IMotionController.h"
@@ -91,9 +92,9 @@ private:
 		/** Which hand this controller is representing */
 		EControllerHand Hand;
 
-		/** If packet num matches that on your prior call, then the controller state hasn't been changed since
+		/** If timestamp matches that on your prior call, then the controller state hasn't been changed since
 		* your last call and there is no need to process it. */
-		uint32 PacketNum;
+		int Timestamp;
 
 		/** touchpad analog values */
 		float TouchPadXAnalog;
@@ -129,7 +130,7 @@ private:
 	/** Mapping of controller buttons */
 	FGamepadKeyNames::Type Buttons[CONTROLLERS_PER_PLAYER][EXimmerseInputButton::TotalButtonCount];
 
-	friend class FXimmerseInputPlugin;
+	friend class FXimmerseInputModule;
 	int32 DeviceHandle[MaxControllers + 1];
 
 #endif // XIMMERSE_INPUT_SUPPORTED_PLATFORMS

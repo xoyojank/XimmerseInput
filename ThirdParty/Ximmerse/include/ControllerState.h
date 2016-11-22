@@ -1,19 +1,17 @@
 #ifndef __XIM_CONTROLLER_STATE_H__
 #define __XIM_CONTROLLER_STATE_H__
 
-// Reference : https://msdn.microsoft.com/en-us/library/windows/apps/microsoft.directx_sdk.reference.xinput_gamepad
 enum ControllerAxis
 {
-	CONTROLLER_AXIS_LEFT_TRIGGER,
-	CONTROLLER_AXIS_RIGHT_TRIGGER,
-	CONTROLLER_AXIS_LEFT_THUMB_X,
-	CONTROLLER_AXIS_LEFT_THUMB_Y,
-	CONTROLLER_AXIS_RIGHT_THUMB_X,
-	CONTROLLER_AXIS_RIGHT_THUMB_Y,
+	CONTROLLER_AXIS_PRIMARY_TRIGGER,
+	CONTROLLER_AXIS_SECONDARY_TRIGGER,
+	CONTROLLER_AXIS_PRIMARY_THUMB_X,
+	CONTROLLER_AXIS_PRIMARY_THUMB_Y,
+	CONTROLLER_AXIS_SECONDARY_THUMB_X,
+	CONTROLLER_AXIS_SECONDARY_THUMB_Y,
 	CONTROLLER_AXIS_MAX,
 };
 
-// Reference : https://msdn.microsoft.com/en-us/library/windows/apps/microsoft.directx_sdk.reference.xinput_gamepad
 enum ControllerButton
 {
 	CONTROLLER_BUTTON_HOME			= 0x0010,
@@ -25,7 +23,7 @@ enum ControllerButton
 	CONTROLLER_BUTTON_TOUCH			= 0x10000,
 	//
 	CONTROLLER_BUTTON_NONE			= 0x0,
-	CONTROLLER_BUTTON_ANY			= ~CONTROLLER_BUTTON_NONE, ,
+	CONTROLLER_BUTTON_ANY			= ~CONTROLLER_BUTTON_NONE,
 };
 
 typedef struct tagControllerState

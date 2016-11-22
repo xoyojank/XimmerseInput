@@ -78,7 +78,7 @@ FXimmerseInput::~FXimmerseInput()
 void FXimmerseInput::SendControllerEvents()
 {
 #if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
-	ControllerState VRControllerState;
+	ControllerState XControllerState;
 
 	const double CurrentTime = FPlatformTime::Seconds();
 
@@ -112,89 +112,92 @@ void FXimmerseInput::SendControllerEvents()
 			HandToUse = (HandToUse == EControllerHand::Left) ? EControllerHand::Right : EControllerHand::Left;
 		}
 
-		if (XDeviceGetInputState(DeviceHandle[DeviceIndex], &VRControllerState) >= 0)
+		if (XDeviceGetInputState(DeviceHandle[DeviceIndex], &XControllerState) >= 0)
 		{
-			bool CurrentStates[EXimmerseInputButton::TotalButtonCount] = { 0 };
-
-			// Get the current state of all buttons
-			CurrentStates[EXimmerseInputButton::System] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_HOME);
-			CurrentStates[EXimmerseInputButton::ApplicationMenu] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_APP);
-			CurrentStates[EXimmerseInputButton::TouchPadPress] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_CLICK);
-			CurrentStates[EXimmerseInputButton::TouchPadTouch] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_TOUCH);
-			CurrentStates[EXimmerseInputButton::TriggerPress] = !!(VRControllerState.buttons & CONTROLLER_BUTTON_TRIGGER);
-			CurrentStates[EXimmerseInputButton::Grip] = !!(VRControllerState.buttons & (CONTROLLER_BUTTON_LEFT_GRIP | CONTROLLER_BUTTON_RIGHT_GRIP));
-
-			// If the touchpad isn't currently pressed or touched, zero put both of the axes
-			if (!CurrentStates[ESteamVRControllerButton::TouchPadTouch])
+			if (XControllerState.timestamp != ControllerState.Timestamp)
 			{
-				VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X] = 0.0f;
-				VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_Y] = 0.0f;
-			}
+				bool CurrentStates[EXimmerseInputButton::TotalButtonCount] = { 0 };
 
-			// D-pad emulation
-			const FVector2D TouchDir = FVector2D(VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X], VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_Y]).GetSafeNormal();
-			const FVector2D UpDir(0.f, 1.f);
-			const FVector2D RightDir(1.f, 0.f);
+				// Get the current state of all buttons
+				CurrentStates[EXimmerseInputButton::System] = !!(XControllerState.buttons & CONTROLLER_BUTTON_HOME);
+				CurrentStates[EXimmerseInputButton::ApplicationMenu] = !!(XControllerState.buttons & CONTROLLER_BUTTON_APP);
+				CurrentStates[EXimmerseInputButton::TouchPadPress] = !!(XControllerState.buttons & CONTROLLER_BUTTON_CLICK);
+				CurrentStates[EXimmerseInputButton::TouchPadTouch] = !!(XControllerState.buttons & CONTROLLER_BUTTON_TOUCH);
+				CurrentStates[EXimmerseInputButton::TriggerPress] = !!(XControllerState.buttons & CONTROLLER_BUTTON_TRIGGER);
+				CurrentStates[EXimmerseInputButton::Grip] = !!(XControllerState.buttons & (CONTROLLER_BUTTON_LEFT_GRIP | CONTROLLER_BUTTON_RIGHT_GRIP));
 
-			const float VerticalDot = TouchDir | UpDir;
-			const float RightDot = TouchDir | RightDir;
-
-			const bool bPressed = !TouchDir.IsNearlyZero() && CurrentStates[EXimmerseInputButton::TouchPadPress];
-
-			CurrentStates[EXimmerseInputButton::TouchPadUp] = bPressed && (VerticalDot >= DOT_45DEG);
-			CurrentStates[EXimmerseInputButton::TouchPadDown] = bPressed && (VerticalDot <= -DOT_45DEG);
-			CurrentStates[EXimmerseInputButton::TouchPadLeft] = bPressed && (RightDot <= -DOT_45DEG);
-			CurrentStates[EXimmerseInputButton::TouchPadRight] = bPressed && (RightDot >= DOT_45DEG);
-
-			if (ControllerState.TouchPadXAnalog != VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X])
-			{
-				const FGamepadKeyNames::Type AxisButton = (HandToUse == EControllerHand::Left) ? FGamepadKeyNames::MotionController_Left_Thumbstick_X : FGamepadKeyNames::MotionController_Right_Thumbstick_X;
-				MessageHandler->OnControllerAnalog(AxisButton, ControllerIndex, VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X]);
-				ControllerState.TouchPadXAnalog = VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_X];
-			}
-
-			if (ControllerState.TouchPadYAnalog != VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_Y])
-			{
-				const FGamepadKeyNames::Type AxisButton = (HandToUse == EControllerHand::Left) ? FGamepadKeyNames::MotionController_Left_Thumbstick_Y : FGamepadKeyNames::MotionController_Right_Thumbstick_Y;
-				// Invert the y to match UE4 convention
-				const float Value = -VRControllerState.axes[CONTROLLER_AXIS_LEFT_THUMB_Y];
-				MessageHandler->OnControllerAnalog(AxisButton, ControllerIndex, Value);
-				ControllerState.TouchPadYAnalog = Value;
-			}
-
-			if (ControllerState.TriggerAnalog != VRControllerState.axes[CONTROLLER_AXIS_LEFT_TRIGGER])
-			{
-				const FGamepadKeyNames::Type AxisButton = (HandToUse == EControllerHand::Left) ? FGamepadKeyNames::MotionController_Left_TriggerAxis : FGamepadKeyNames::MotionController_Right_TriggerAxis;
-				MessageHandler->OnControllerAnalog(AxisButton, ControllerIndex, VRControllerState.axes[CONTROLLER_AXIS_LEFT_TRIGGER]);
-				ControllerState.TriggerAnalog = VRControllerState.axes[CONTROLLER_AXIS_LEFT_TRIGGER];
-			}
-
-			// For each button check against the previous state and send the correct message if any
-			for (int32 ButtonIndex = 0; ButtonIndex < EXimmerseInputButton::TotalButtonCount; ++ButtonIndex)
-			{
-				if (CurrentStates[ButtonIndex] != ControllerState.ButtonStates[ButtonIndex])
+				// If the touchpad isn't currently pressed or touched, zero put both of the axes
+				if (!CurrentStates[EXimmerseInputButton::TouchPadTouch])
 				{
-					if (CurrentStates[ButtonIndex])
-					{
-						MessageHandler->OnControllerButtonPressed(Buttons[(int32)HandToUse][ButtonIndex], ControllerIndex, false);
-					}
-					else
-					{
-						MessageHandler->OnControllerButtonReleased(Buttons[(int32)HandToUse][ButtonIndex], ControllerIndex, false);
-					}
-
-					if (CurrentStates[ButtonIndex] != 0)
-					{
-						// this button was pressed - set the button's NextRepeatTime to the InitialButtonRepeatDelay
-						ControllerState.NextRepeatTime[ButtonIndex] = CurrentTime + InitialButtonRepeatDelay;
-					}
+					XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_X] = 0.0f;
+					XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_Y] = 0.0f;
 				}
 
-				// Update the state for next time
-				ControllerState.ButtonStates[ButtonIndex] = CurrentStates[ButtonIndex];
-			}
+				// D-pad emulation
+				const FVector2D TouchDir = FVector2D(XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_X], XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_Y]).GetSafeNormal();
+				const FVector2D UpDir(0.f, 1.f);
+				const FVector2D RightDir(1.f, 0.f);
 
-			ControllerState.PacketNum = VRControllerState.unPacketNum;
+				const float VerticalDot = TouchDir | UpDir;
+				const float RightDot = TouchDir | RightDir;
+
+				const bool bPressed = !TouchDir.IsNearlyZero() && CurrentStates[EXimmerseInputButton::TouchPadPress];
+
+				CurrentStates[EXimmerseInputButton::TouchPadUp] = bPressed && (VerticalDot >= DOT_45DEG);
+				CurrentStates[EXimmerseInputButton::TouchPadDown] = bPressed && (VerticalDot <= -DOT_45DEG);
+				CurrentStates[EXimmerseInputButton::TouchPadLeft] = bPressed && (RightDot <= -DOT_45DEG);
+				CurrentStates[EXimmerseInputButton::TouchPadRight] = bPressed && (RightDot >= DOT_45DEG);
+
+				if (ControllerState.TouchPadXAnalog != XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_X])
+				{
+					const FGamepadKeyNames::Type AxisButton = (HandToUse == EControllerHand::Left) ? FGamepadKeyNames::MotionController_Left_Thumbstick_X : FGamepadKeyNames::MotionController_Right_Thumbstick_X;
+					MessageHandler->OnControllerAnalog(AxisButton, ControllerIndex, XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_X]);
+					ControllerState.TouchPadXAnalog = XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_X];
+				}
+
+				if (ControllerState.TouchPadYAnalog != XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_Y])
+				{
+					const FGamepadKeyNames::Type AxisButton = (HandToUse == EControllerHand::Left) ? FGamepadKeyNames::MotionController_Left_Thumbstick_Y : FGamepadKeyNames::MotionController_Right_Thumbstick_Y;
+					// Invert the y to match UE4 convention
+					const float Value = -XControllerState.axes[CONTROLLER_AXIS_PRIMARY_THUMB_Y];
+					MessageHandler->OnControllerAnalog(AxisButton, ControllerIndex, Value);
+					ControllerState.TouchPadYAnalog = Value;
+				}
+
+				if (ControllerState.TriggerAnalog != XControllerState.axes[CONTROLLER_AXIS_PRIMARY_TRIGGER])
+				{
+					const FGamepadKeyNames::Type AxisButton = (HandToUse == EControllerHand::Left) ? FGamepadKeyNames::MotionController_Left_TriggerAxis : FGamepadKeyNames::MotionController_Right_TriggerAxis;
+					MessageHandler->OnControllerAnalog(AxisButton, ControllerIndex, XControllerState.axes[CONTROLLER_AXIS_PRIMARY_TRIGGER]);
+					ControllerState.TriggerAnalog = XControllerState.axes[CONTROLLER_AXIS_PRIMARY_TRIGGER];
+				}
+
+				// For each button check against the previous state and send the correct message if any
+				for (int32 ButtonIndex = 0; ButtonIndex < EXimmerseInputButton::TotalButtonCount; ++ButtonIndex)
+				{
+					if (CurrentStates[ButtonIndex] != ControllerState.ButtonStates[ButtonIndex])
+					{
+						if (CurrentStates[ButtonIndex])
+						{
+							MessageHandler->OnControllerButtonPressed(Buttons[(int32)HandToUse][ButtonIndex], ControllerIndex, false);
+						}
+						else
+						{
+							MessageHandler->OnControllerButtonReleased(Buttons[(int32)HandToUse][ButtonIndex], ControllerIndex, false);
+						}
+
+						if (CurrentStates[ButtonIndex] != 0)
+						{
+							// this button was pressed - set the button's NextRepeatTime to the InitialButtonRepeatDelay
+							ControllerState.NextRepeatTime[ButtonIndex] = CurrentTime + InitialButtonRepeatDelay;
+						}
+					}
+
+					// Update the state for next time
+					ControllerState.ButtonStates[ButtonIndex] = CurrentStates[ButtonIndex];
+				}
+
+				ControllerState.Timestamp = XControllerState.timestamp;
+			}
 		}
 
 		for (int32 ButtonIndex = 0; ButtonIndex < EXimmerseInputButton::TotalButtonCount; ++ButtonIndex)
@@ -212,7 +215,7 @@ void FXimmerseInput::SendControllerEvents()
 }
 void FXimmerseInput::SetChannelValue(int32 UnrealControllerId, FForceFeedbackChannelType ChannelType, float Value)
 {
-#if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
+#if XIMMERSE_INPUT_SUPPORTED_PLATFORMS && XIMMERSE_INPUT_VIBRATION_ENABLED
 	// Skip unless this is the left or right large channel, which we consider to be the only XimmerseInput feedback channel
 	if (ChannelType != FForceFeedbackChannelType::LEFT_LARGE && ChannelType != FForceFeedbackChannelType::RIGHT_LARGE)
 	{
@@ -236,7 +239,7 @@ void FXimmerseInput::SetChannelValue(int32 UnrealControllerId, FForceFeedbackCha
 
 void FXimmerseInput::SetChannelValues(int32 UnrealControllerId, const FForceFeedbackValues& Values)
 {
-#if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
+#if XIMMERSE_INPUT_SUPPORTED_PLATFORMS && XIMMERSE_INPUT_VIBRATION_ENABLED
 	const int32 LeftControllerIndex = UnrealControllerIdToControllerIndex(UnrealControllerId, EControllerHand::Left);
 	if ((LeftControllerIndex >= 0) && (LeftControllerIndex < MaxControllers))
 	{
@@ -259,7 +262,7 @@ void FXimmerseInput::SetChannelValues(int32 UnrealControllerId, const FForceFeed
 
 void FXimmerseInput::SetHapticFeedbackValues(int32 UnrealControllerId, int32 Hand, const FHapticFeedbackValues& Values)
 {
-#if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
+#if XIMMERSE_INPUT_SUPPORTED_PLATFORMS && XIMMERSE_INPUT_VIBRATION_ENABLED
 	if (Hand != (int32)EControllerHand::Left && Hand != (int32)EControllerHand::Right)
 	{
 		return;
@@ -281,12 +284,23 @@ bool FXimmerseInput::GetControllerOrientationAndPosition(const int32 ControllerI
 	bool RetVal = false;
 
 #if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
-	FSteamVRHMD* SteamVRHMD = GetSteamVRHMD();
-	if (SteamVRHMD)
+	int32 DeviceIndex = ControllerToDeviceMap[ControllerIndex];
+
+	ControllerState XControllerState;
+	if (XDeviceGetInputState(DeviceHandle[DeviceIndex], &XControllerState) >= 0)
 	{
-		FQuat DeviceOrientation = FQuat::Identity;
-		RetVal = SteamVRHMD->GetControllerHandPositionAndOrientation(ControllerIndex, DeviceHand, OutPosition, DeviceOrientation);
-		OutOrientation = DeviceOrientation.Rotator();
+		RetVal = true;
+
+		OutPosition.X = -XControllerState.position[2] * 100;
+		OutPosition.Y = XControllerState.position[0] * 100;
+		OutPosition.Z = XControllerState.position[1] * 100;
+
+		FQuat Rotation;
+		Rotation.X = XControllerState.rotation[2];
+		Rotation.Y = -XControllerState.rotation[0];
+		Rotation.Z = -XControllerState.rotation[1];
+		Rotation.W = XControllerState.rotation[3];
+		OutOrientation = Rotation.Rotator();
 	}
 #endif // XIMMERSE_INPUT_SUPPORTED_PLATFORMS
 
@@ -298,10 +312,11 @@ ETrackingStatus FXimmerseInput::GetControllerTrackingStatus(const int32 Controll
 	ETrackingStatus TrackingStatus = ETrackingStatus::NotTracked;
 
 #if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
-	FSteamVRHMD* SteamVRHMD = GetSteamVRHMD();
-	if (SteamVRHMD)
+	int32 DeviceIndex = ControllerToDeviceMap[ControllerIndex];
+	TrackingResult Result = (TrackingResult)XDeviceGetInt(DeviceHandle[DeviceIndex], FieldID::kField_TrackingResult, 0);
+	if (Result != TrackingResult::kTrackingResult_NotTracked)
 	{
-		TrackingStatus = SteamVRHMD->GetControllerTrackingStatus(ControllerIndex, DeviceHand);
+		TrackingStatus = ETrackingStatus::Tracked;
 	}
 #endif // XIMMERSE_INPUT_SUPPORTED_PLATFORMS
 
@@ -316,6 +331,7 @@ int32 FXimmerseInput::UnrealControllerIdToControllerIndex(const int32 UnrealCont
 
 void FXimmerseInput::UpdateVibration(const int32 ControllerIndex)
 {
+#if XIMMERSE_INPUT_VIBRATION_ENABLED
 	// make sure there is a valid device for this controller
 	int32 DeviceIndex = ControllerToDeviceMap[ControllerIndex];
 	if (DeviceIndex < 0)
@@ -337,55 +353,18 @@ void FXimmerseInput::UpdateVibration(const int32 ControllerIndex)
 	{
 		VRSystem->TriggerHapticPulse(DeviceIndex, TOUCHPAD_AXIS, LeftIntensity);
 	}
+#endif
 }
 
 bool FXimmerseInput::IsGamepadAttached() const
 {
-	FSteamVRHMD* SteamVRSystem = GetSteamVRHMD();
+	// Check if at least one motion controller is tracked
+	// Only need to check for at least one player (player index 0)
+	int32 PlayerIndex = 0;
+	ETrackingStatus LeftHandTrackingStatus = GetControllerTrackingStatus(PlayerIndex, EControllerHand::Left);
+	ETrackingStatus RightHandTrackingStatus = GetControllerTrackingStatus(PlayerIndex, EControllerHand::Right);
 
-	if (SteamVRSystem != nullptr)
-	{
-		// Check if at least one motion controller is tracked
-		// Only need to check for at least one player (player index 0)
-		int32 PlayerIndex = 0;
-		ETrackingStatus LeftHandTrackingStatus = GetControllerTrackingStatus(PlayerIndex, EControllerHand::Left);
-		ETrackingStatus RightHandTrackingStatus = GetControllerTrackingStatus(PlayerIndex, EControllerHand::Right);
-
-		return LeftHandTrackingStatus == ETrackingStatus::Tracked || RightHandTrackingStatus == ETrackingStatus::Tracked;
-	}
-
-	return false;
+	return LeftHandTrackingStatus == ETrackingStatus::Tracked || RightHandTrackingStatus == ETrackingStatus::Tracked;
 }
 
 #endif // XIMMERSE_INPUT_SUPPORTED_PLATFORMS
-
-
-class FXimmerseInputPlugin : public IXimmerseInputPlugin
-{
-	FXimmerseInput* XimmerseInput = nullptr;
-
-	virtual TSharedPtr< class IInputDevice > CreateInputDevice(const TSharedRef< FGenericApplicationMessageHandler >& InMessageHandler) override
-	{
-		XimmerseInput = new FXimmerseInput(InMessageHandler);
-		return TSharedPtr< class IInputDevice >(XimmerseInput);
-	}
-
-	virtual void StartupModule() override
-	{
-		IXimmerseInputPlugin::StartupModule();
-
-		XDeviceInit();
-		XimmerseInput->DeviceHandle[0] = XDeviceGetInputDeviceHandle("XCobra-0");
-		XimmerseInput->DeviceHandle[1] = XDeviceGetInputDeviceHandle("XCobra-1");
-		XimmerseInput->DeviceHandle[2] = XDeviceGetInputDeviceHandle("XHawk-0");
-	}
-
-	virtual void ShutdownModule() override
-	{
-		IXimmerseInputPlugin::ShutdownModule();
-
-		XDeviceExit();
-	}
-};
-
-IMPLEMENT_MODULE(FXimmerseInputPlugin, XimmerseInput)

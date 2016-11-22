@@ -1,4 +1,5 @@
 // Copyright 1998-2016 Epic Games, Inc. All Rights Reserved.
+#pragma once
 
 // for XIMMERSE_INPUT_SUPPORTED_PLATFORMS, keep at top
 #include "IXimmerseInputPlugin.h"
