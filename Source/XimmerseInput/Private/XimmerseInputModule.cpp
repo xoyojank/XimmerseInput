@@ -10,11 +10,12 @@
 
 class FXimmerseInputModule : public IXimmerseInputPlugin
 {
-	FXimmerseInput* XimmerseInput = nullptr;
-
 	virtual TSharedPtr< class IInputDevice > CreateInputDevice(const TSharedRef< FGenericApplicationMessageHandler >& InMessageHandler) override
 	{
-		XimmerseInput = new FXimmerseInput(InMessageHandler);
+		FXimmerseInput* XimmerseInput = new FXimmerseInput(InMessageHandler);
+		XimmerseInput->DeviceHandle[0] = XDeviceGetInputDeviceHandle("XCobra-0");
+		XimmerseInput->DeviceHandle[1] = XDeviceGetInputDeviceHandle("XCobra-1");
+		XimmerseInput->DeviceHandle[2] = XDeviceGetInputDeviceHandle("XHawk-0");
 		return TSharedPtr< class IInputDevice >(XimmerseInput);
 	}
 
@@ -23,9 +24,6 @@ class FXimmerseInputModule : public IXimmerseInputPlugin
 		IXimmerseInputPlugin::StartupModule();
 
 		XDeviceInit();
-		XimmerseInput->DeviceHandle[0] = XDeviceGetInputDeviceHandle("XCobra-0");
-		XimmerseInput->DeviceHandle[1] = XDeviceGetInputDeviceHandle("XCobra-1");
-		XimmerseInput->DeviceHandle[2] = XDeviceGetInputDeviceHandle("XHawk-0");
 	}
 
 	virtual void ShutdownModule() override

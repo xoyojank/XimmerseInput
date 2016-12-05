@@ -56,6 +56,7 @@ public class XimmerseInput : ModuleRules
 		{
 			isLibrarySupported = true;
 			PublicAdditionalLibraries.Add(Path.Combine(ThirdPartyPath, "Ximmerse/libs/x64", "xdevice.lib"));
+			PublicDelayLoadDLLs.Add(Path.Combine(ThirdPartyPath, "Ximmerse/libs/x64", "xdevice.dll"));
 		}
 		else if (Target.Platform == UnrealTargetPlatform.Android)
 		{

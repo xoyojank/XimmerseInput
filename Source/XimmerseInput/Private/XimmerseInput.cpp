@@ -13,6 +13,8 @@ DEFINE_LOG_CATEGORY_STATIC(LogXimmerseInput, Log, All);
 //
 #define TOUCHPAD_DEADZONE  0.0f
 
+#define LOCTEXT_NAMESPACE "XimmerseInput"
+
 // Controls whether or not we need to swap the input routing for the hands, for debugging
 static TAutoConsoleVariable<int32> CVarSwapHands(
     TEXT("vr.SwapMotionControllerInput"),
@@ -21,6 +23,12 @@ static TAutoConsoleVariable<int32> CVarSwapHands(
     TEXT(" 0: don't swap (default)\n")
     TEXT(" 1: swap left and right buttons"),
     ECVF_Cheat);
+
+namespace XimmerseControllerKeyNames
+{
+const FGamepadKeyNames::Type Touch0("Ximmerse_Touch_0");
+const FGamepadKeyNames::Type Touch1("Ximmerse_Touch_1");
+}
 
 
 FXimmerseInput::FXimmerseInput(const TSharedRef< FGenericApplicationMessageHandler >& InMessageHandler)
@@ -44,9 +52,13 @@ FXimmerseInput::FXimmerseInput(const TSharedRef< FGenericApplicationMessageHandl
 	InitialButtonRepeatDelay = 0.2f;
 	ButtonRepeatDelay = 0.1f;
 
+	EKeys::AddKey(FKeyDetails(FKey(XimmerseControllerKeyNames::Touch0), LOCTEXT("Ximmerse_Touch_0", "MotionController (L) Touchpad"), FKeyDetails::GamepadKey | FKeyDetails::FloatAxis));
+	EKeys::AddKey(FKeyDetails(FKey(XimmerseControllerKeyNames::Touch1), LOCTEXT("Ximmerse_Touch_1", "MotionController (R) Touchpad"), FKeyDetails::GamepadKey | FKeyDetails::FloatAxis));
+
 	Buttons[(int32)EControllerHand::Left][EXimmerseInputButton::System] = FGamepadKeyNames::SpecialLeft;
 	Buttons[(int32)EControllerHand::Left][EXimmerseInputButton::ApplicationMenu] = FGamepadKeyNames::MotionController_Left_Shoulder;
 	Buttons[(int32)EControllerHand::Left][EXimmerseInputButton::TouchPadPress] = FGamepadKeyNames::MotionController_Left_Thumbstick;
+	Buttons[(int32)EControllerHand::Left][EXimmerseInputButton::TouchPadTouch] = XimmerseControllerKeyNames::Touch0;
 	Buttons[(int32)EControllerHand::Left][EXimmerseInputButton::TriggerPress] = FGamepadKeyNames::MotionController_Left_Trigger;
 	Buttons[(int32)EControllerHand::Left][EXimmerseInputButton::Grip] = FGamepadKeyNames::MotionController_Left_Grip1;
 	Buttons[(int32)EControllerHand::Left][EXimmerseInputButton::TouchPadUp] = FGamepadKeyNames::MotionController_Left_FaceButton1;
@@ -57,6 +69,7 @@ FXimmerseInput::FXimmerseInput(const TSharedRef< FGenericApplicationMessageHandl
 	Buttons[(int32)EControllerHand::Right][EXimmerseInputButton::System] = FGamepadKeyNames::SpecialRight;
 	Buttons[(int32)EControllerHand::Right][EXimmerseInputButton::ApplicationMenu] = FGamepadKeyNames::MotionController_Right_Shoulder;
 	Buttons[(int32)EControllerHand::Right][EXimmerseInputButton::TouchPadPress] = FGamepadKeyNames::MotionController_Right_Thumbstick;
+	Buttons[(int32)EControllerHand::Right][EXimmerseInputButton::TouchPadTouch] = XimmerseControllerKeyNames::Touch1;
 	Buttons[(int32)EControllerHand::Right][EXimmerseInputButton::TriggerPress] = FGamepadKeyNames::MotionController_Right_Trigger;
 	Buttons[(int32)EControllerHand::Right][EXimmerseInputButton::Grip] = FGamepadKeyNames::MotionController_Right_Grip1;
 	Buttons[(int32)EControllerHand::Right][EXimmerseInputButton::TouchPadUp] = FGamepadKeyNames::MotionController_Right_FaceButton1;
@@ -123,7 +136,6 @@ void FXimmerseInput::SendControllerEvents()
 				CurrentStates[EXimmerseInputButton::ApplicationMenu] = !!(XControllerState.buttons & CONTROLLER_BUTTON_APP);
 				CurrentStates[EXimmerseInputButton::TouchPadPress] = !!(XControllerState.buttons & CONTROLLER_BUTTON_CLICK);
 				CurrentStates[EXimmerseInputButton::TouchPadTouch] = !!(XControllerState.buttons & CONTROLLER_BUTTON_TOUCH);
-				CurrentStates[EXimmerseInputButton::TriggerPress] = !!(XControllerState.buttons & CONTROLLER_BUTTON_TRIGGER);
 				CurrentStates[EXimmerseInputButton::Grip] = !!(XControllerState.buttons & (CONTROLLER_BUTTON_LEFT_GRIP | CONTROLLER_BUTTON_RIGHT_GRIP));
 
 				// If the touchpad isn't currently pressed or touched, zero put both of the axes
@@ -169,6 +181,9 @@ void FXimmerseInput::SendControllerEvents()
 					const FGamepadKeyNames::Type AxisButton = (HandToUse == EControllerHand::Left) ? FGamepadKeyNames::MotionController_Left_TriggerAxis : FGamepadKeyNames::MotionController_Right_TriggerAxis;
 					MessageHandler->OnControllerAnalog(AxisButton, ControllerIndex, XControllerState.axes[CONTROLLER_AXIS_PRIMARY_TRIGGER]);
 					ControllerState.TriggerAnalog = XControllerState.axes[CONTROLLER_AXIS_PRIMARY_TRIGGER];
+
+					// emulate trigger button state
+					CurrentStates[EXimmerseInputButton::TriggerPress] = ControllerState.TriggerAnalog > 0.5f;
 				}
 
 				// For each button check against the previous state and send the correct message if any
@@ -279,11 +294,12 @@ void FXimmerseInput::SetHapticFeedbackValues(int32 UnrealControllerId, int32 Han
 #endif
 }
 
-bool FXimmerseInput::GetControllerOrientationAndPosition(const int32 ControllerIndex, const EControllerHand DeviceHand, FRotator& OutOrientation, FVector& OutPosition) const
+bool FXimmerseInput::GetControllerOrientationAndPosition(const int32 UnrealControllerId, const EControllerHand DeviceHand, FRotator& OutOrientation, FVector& OutPosition) const
 {
 	bool RetVal = false;
 
 #if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
+	const int32 ControllerIndex = UnrealControllerIdToControllerIndex(UnrealControllerId, DeviceHand);
 	int32 DeviceIndex = ControllerToDeviceMap[ControllerIndex];
 
 	ControllerState XControllerState;
@@ -301,17 +317,21 @@ bool FXimmerseInput::GetControllerOrientationAndPosition(const int32 ControllerI
 		Rotation.Z = -XControllerState.rotation[1];
 		Rotation.W = XControllerState.rotation[3];
 		OutOrientation = Rotation.Rotator();
+
+		UE_LOG(LogXimmerseInput, Log, TEXT("Position(%f, %f, %f), Rotation(%f, %f, %f)"),
+		       OutPosition.X, OutPosition.Y, OutPosition.Z, OutOrientation.Pitch, OutOrientation.Yaw, OutOrientation.Roll);
 	}
 #endif // XIMMERSE_INPUT_SUPPORTED_PLATFORMS
 
 	return RetVal;
 }
 
-ETrackingStatus FXimmerseInput::GetControllerTrackingStatus(const int32 ControllerIndex, const EControllerHand DeviceHand) const
+ETrackingStatus FXimmerseInput::GetControllerTrackingStatus(const int32 UnrealControllerId, const EControllerHand DeviceHand) const
 {
 	ETrackingStatus TrackingStatus = ETrackingStatus::NotTracked;
 
 #if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
+	const int32 ControllerIndex = UnrealControllerIdToControllerIndex(UnrealControllerId, DeviceHand);
 	int32 DeviceIndex = ControllerToDeviceMap[ControllerIndex];
 	TrackingResult Result = (TrackingResult)XDeviceGetInt(DeviceHandle[DeviceIndex], FieldID::kField_TrackingResult, 0);
 	if (Result != TrackingResult::kTrackingResult_NotTracked)
@@ -367,4 +387,5 @@ bool FXimmerseInput::IsGamepadAttached() const
 	return LeftHandTrackingStatus == ETrackingStatus::Tracked || RightHandTrackingStatus == ETrackingStatus::Tracked;
 }
 
+#undef LOCTEXT_NAMESPACE
 #endif // XIMMERSE_INPUT_SUPPORTED_PLATFORMS

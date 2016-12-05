@@ -75,9 +75,9 @@ public:
 		return false;
 	}
 
-	virtual bool GetControllerOrientationAndPosition(const int32 ControllerIndex, const EControllerHand DeviceHand, FRotator& OutOrientation, FVector& OutPosition) const;
+	virtual bool GetControllerOrientationAndPosition(const int32 UnrealControllerId, const EControllerHand DeviceHand, FRotator& OutOrientation, FVector& OutPosition) const;
 
-	virtual ETrackingStatus GetControllerTrackingStatus(const int32 ControllerIndex, const EControllerHand DeviceHand) const;
+	virtual ETrackingStatus GetControllerTrackingStatus(const int32 UnrealControllerId, const EControllerHand DeviceHand) const;
 
 #if XIMMERSE_INPUT_SUPPORTED_PLATFORMS
 
