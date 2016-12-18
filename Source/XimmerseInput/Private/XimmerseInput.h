@@ -111,6 +111,9 @@ private:
 
 		/** Value for force feedback on this controller hand */
 		float ForceFeedbackValue;
+
+		FVector Position;
+		FRotator Orientation;
 	};
 
 	/** Mappings between tracked devices and 0 indexed controllers */

@@ -211,6 +211,25 @@ void FXimmerseInput::SendControllerEvents()
 					ControllerState.ButtonStates[ButtonIndex] = CurrentStates[ButtonIndex];
 				}
 
+				// get position and rotation here for thread safe
+				ControllerState.Position.X = -XControllerState.position[2] * 100;
+				ControllerState.Position.Y = XControllerState.position[0] * 100;
+				ControllerState.Position.Z = XControllerState.position[1] * 100;
+				FQuat Rotation;
+				Rotation.X = XControllerState.rotation[2];
+				Rotation.Y = -XControllerState.rotation[0];
+				Rotation.Z = -XControllerState.rotation[1];
+				Rotation.W = XControllerState.rotation[3];
+				ControllerState.Orientation = Rotation.Rotator();
+				TrackingResult Result = (TrackingResult)XDeviceGetInt(DeviceHandle[DeviceIndex], FieldID::kField_TrackingResult, 0);
+				if (Result != TrackingResult::kTrackingResult_NotTracked)
+				{
+					UE_LOG(LogXimmerseInput, Log, TEXT("Position(%.1f, %.1f, %.1f), Rotation(%.1f, %.1f, %.1f)"),
+					       ControllerState.Position.X, ControllerState.Position.Y, ControllerState.Position.Z,
+					       ControllerState.Orientation.Roll, ControllerState.Orientation.Pitch, ControllerState.Orientation.Yaw);
+				}
+
+
 				ControllerState.Timestamp = XControllerState.timestamp;
 			}
 		}
@@ -302,25 +321,27 @@ bool FXimmerseInput::GetControllerOrientationAndPosition(const int32 UnrealContr
 	const int32 ControllerIndex = UnrealControllerIdToControllerIndex(UnrealControllerId, DeviceHand);
 	int32 DeviceIndex = ControllerToDeviceMap[ControllerIndex];
 
-	ControllerState XControllerState;
-	if (XDeviceGetInputState(DeviceHandle[DeviceIndex], &XControllerState) >= 0)
-	{
-		RetVal = true;
+	OutPosition = ControllerStates[DeviceIndex].Position;
+	OutOrientation = ControllerStates[DeviceIndex].Orientation;
+	RetVal = true;
 
-		OutPosition.X = -XControllerState.position[2] * 100;
-		OutPosition.Y = XControllerState.position[0] * 100;
-		OutPosition.Z = XControllerState.position[1] * 100;
+	// NOT THREAD SAFE
+	//ControllerState XControllerState;
+	//if (XDeviceGetInputState(DeviceHandle[DeviceIndex], &XControllerState) >= 0)
+	//{
+	//	RetVal = true;
 
-		FQuat Rotation;
-		Rotation.X = XControllerState.rotation[2];
-		Rotation.Y = -XControllerState.rotation[0];
-		Rotation.Z = -XControllerState.rotation[1];
-		Rotation.W = XControllerState.rotation[3];
-		OutOrientation = Rotation.Rotator();
+	//	OutPosition.X = -XControllerState.position[2] * 100;
+	//	OutPosition.Y = XControllerState.position[0] * 100;
+	//	OutPosition.Z = XControllerState.position[1] * 100;
 
-		UE_LOG(LogXimmerseInput, Log, TEXT("Position(%f, %f, %f), Rotation(%f, %f, %f)"),
-		       OutPosition.X, OutPosition.Y, OutPosition.Z, OutOrientation.Pitch, OutOrientation.Yaw, OutOrientation.Roll);
-	}
+	//	FQuat Rotation;
+	//	Rotation.X = -XControllerState.rotation[2];
+	//	Rotation.Y = XControllerState.rotation[0];
+	//	Rotation.Z = XControllerState.rotation[1];
+	//	Rotation.W = -XControllerState.rotation[3];
+	//	OutOrientation = Rotation.Rotator();
+	//}
 #endif // XIMMERSE_INPUT_SUPPORTED_PLATFORMS
 
 	return RetVal;
